@@ -11,7 +11,7 @@ def obtener_datos():
     )
 
     # Abrir la hoja de cálculo
-    archivo = cliente.open("BD_Ventas")
+    archivo = cliente.open_by_key("1rnRaD7koIQbQ1Ncu2RKpur6Qgy5jCuJmLz2ms8lgZkw")
 
     # Seleccionar la primera hoja
     hoja = archivo.sheet1
