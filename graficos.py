@@ -1,72 +1,247 @@
-import matplotlib.pyplot as plt
-from analisis import agrupar_por_producto, calcular_ventas, contar_registros
-from conexion_sheets import obtener_datos
+import plotly.graph_objects as go
 
-datos = obtener_datos()
-resumen = agrupar_por_producto(datos)
-total_reg = contar_registros(datos)
-total_ven = calcular_ventas(datos)
-
-productos = list(resumen.keys())
-cantidades = list(resumen.values())
-colores = ["#3B82F6", "#10B981", "#F59E0B", "#8B5CF6"]
-
-# 1. PRIMER GRÁFICO: BARRAS
-plt.figure(figsize=(7, 4))
-plt.bar(
-    productos, cantidades, color=colores[: len(productos)], edgecolor="black"
+from analisis import (
+    agrupar_por_producto,
+    contar_ventas_por_estado,
+    normalizar_texto,
+    ventas_por_canal,
+    ventas_por_categoria,
+    ventas_por_ciudad,
+    ventas_por_estado,
+    ventas_por_fecha,
+    ventas_por_producto,
+    ventas_por_region,
+    ventas_por_vendedor,
 )
 
-plt.title("1. Unidades Vendidas por Producto", fontsize=14, fontweight="bold")
-plt.xlabel("Producto")
-plt.ylabel("Unidades Vendidas")
-plt.grid(axis="y", linestyle="--", alpha=0.5)
 
-plt.tight_layout()
-plt.show()
+COLORES = ["#3157A4", "#438A76", "#D59B3D", "#755B9D", "#3B8A9B", "#B95D55"]
+COLOR_ESTADOS = {
+    "completada": "#438A76",
+    "pendiente": "#D59B3D",
+    "cancelada": "#B95D55",
+}
 
-# 2. SEGUNDO GRÁFICO: DONA
-plt.figure(figsize=(6, 6))
-plt.pie(
-    cantidades,
-    labels=productos,
-    autopct="%1.1f%%",
-    startangle=140,
-    colors=colores[: len(productos)],
-)
 
-circulo_centro = plt.Circle((0, 0), 0.60, fc="white")
-fig = plt.gcf()
-fig.gca().add_artist(circulo_centro)
+def _estilo_base(figura, titulo, altura=370):
+    figura.update_layout(
+        title=dict(text=titulo, x=0.03, xanchor="left", font=dict(size=15, color="#172033")),
+        template="plotly_white",
+        autosize=True,
+        height=altura,
+        margin=dict(l=20, r=28, t=58, b=35),
+        font=dict(family="Segoe UI, Arial, sans-serif", color="#526078", size=11),
+        hoverlabel=dict(bgcolor="#14213D", font_color="#FFFFFF"),
+        paper_bgcolor="#FFFFFF",
+        plot_bgcolor="#FFFFFF",
+    )
+    figura.update_xaxes(showgrid=True, gridcolor="#EDF0F4", zeroline=False)
+    figura.update_yaxes(showgrid=False, zeroline=False)
+    if not figura.data:
+        figura.add_annotation(
+            text="No hay datos disponibles para mostrar.",
+            x=0.5,
+            y=0.48,
+            xref="paper",
+            yref="paper",
+            showarrow=False,
+            font=dict(size=13, color="#68738A"),
+        )
+    return figura
 
-plt.title("2. Distribución Porcentual (%)", fontsize=14, fontweight="bold")
 
-plt.tight_layout()
-plt.show()
+def _grafico_barras(resumen, titulo, entidad, monetario=False, color=COLORES[0]):
+    figura = go.Figure()
+    ordenados = sorted(resumen.items(), key=lambda item: item[1])
+    if ordenados:
+        etiquetas, valores = zip(*ordenados)
+        formato = "S/ {:,.2f}".format if monetario else "{:,.0f}".format
+        figura.add_trace(
+            go.Bar(
+                x=list(valores),
+                y=list(etiquetas),
+                orientation="h",
+                marker_color=color,
+                text=[formato(valor) for valor in valores],
+                textposition="outside",
+                cliponaxis=False,
+                hovertemplate=(
+                    f"{entidad}: %{{y}}<br>"
+                    + ("Importe: S/ %{x:,.2f}" if monetario else "Unidades: %{x:,.0f}")
+                    + "<extra></extra>"
+                ),
+            )
+        )
+    altura = max(350, min(600, 170 + 30 * len(resumen)))
+    figura = _estilo_base(figura, titulo, altura)
+    figura.update_layout(margin=dict(l=155, r=48, t=58, b=35), showlegend=False)
+    figura.update_xaxes(
+        title="Importe (S/)" if monetario else "Unidades",
+        tickformat=",.2f" if monetario else ",.0f",
+        separatethousands=True,
+    )
+    figura.update_yaxes(title=None)
+    return figura
 
-# 3. TERCER GRÁFICO: TARJETA DE MÉTRICAS (KPIs)
-plt.figure(figsize=(5, 4))
-plt.axis("off")
 
-texto_kpi = (
-    "MÉTRICAS CLAVE\n\n"
-    f"• Total Registros: {total_reg}\n\n"
-    f"• Total Unidades: {sum(cantidades)}\n\n"
-    f"• Ventas Totales: S/ {total_ven:,.2f}"
-)
+def _grafico_dona(resumen, titulo, entidad, monetario=False):
+    figura = go.Figure()
+    if resumen:
+        etiquetas = list(resumen.keys())
+        valores = list(resumen.values())
+        colores = [
+            COLOR_ESTADOS.get(normalizar_texto(etiqueta), COLORES[indice % len(COLORES)])
+            for indice, etiqueta in enumerate(etiquetas)
+        ]
+        figura.add_trace(
+            go.Pie(
+                labels=etiquetas,
+                values=valores,
+                hole=0.62,
+                marker=dict(colors=colores, line=dict(color="#FFFFFF", width=2)),
+                textinfo="percent",
+                textposition="inside",
+                sort=False,
+                hovertemplate=(
+                    f"{entidad}: %{{label}}<br>"
+                    + ("Importe: S/ %{value:,.2f}" if monetario else "Operaciones: %{value:,.0f}")
+                    + "<br>Participación: %{percent}<extra></extra>"
+                ),
+            )
+        )
+    _estilo_base(figura, titulo, 380)
+    figura.update_layout(
+        showlegend=True,
+        legend=dict(orientation="h", x=0.5, xanchor="center", y=-0.08, yanchor="top"),
+        margin=dict(l=20, r=20, t=58, b=70),
+    )
+    return figura
 
-plt.text(
-    0.1,
-    0.5,
-    texto_kpi,
-    fontsize=13,
-    verticalalignment="center",
-    bbox=dict(
-        boxstyle="round,pad=1.2", facecolor="#EBF3F9", edgecolor="#3B82F6"
-    ),
-)
 
-plt.title("3. Resumen General", fontsize=14, fontweight="bold")
+def grafico_barras(datos):
+    return _grafico_barras(
+        agrupar_por_producto(datos, solo_completadas=True),
+        "Unidades vendidas por producto",
+        "Producto",
+        color=COLORES[0],
+    )
 
-plt.tight_layout()
-plt.show()
+
+def grafico_dona(datos):
+    return _grafico_barras(
+        ventas_por_producto(datos, solo_completadas=True),
+        "Ventas completadas por producto",
+        "Producto",
+        monetario=True,
+        color=COLORES[1],
+    )
+
+
+def grafico_vendedores(datos):
+    return _grafico_barras(
+        ventas_por_vendedor(datos, solo_completadas=True),
+        "Ventas completadas por vendedor",
+        "Vendedor",
+        monetario=True,
+        color=COLORES[1],
+    )
+
+
+def grafico_categorias(datos):
+    return _grafico_dona(
+        ventas_por_categoria(datos, solo_completadas=True),
+        "Ventas completadas por categoría",
+        "Categoría",
+        monetario=True,
+    )
+
+
+def grafico_canales(datos):
+    return _grafico_barras(
+        ventas_por_canal(datos, solo_completadas=True),
+        "Ventas completadas por canal",
+        "Canal",
+        monetario=True,
+        color=COLORES[2],
+    )
+
+
+def grafico_ciudades(datos):
+    return _grafico_barras(
+        ventas_por_ciudad(datos, solo_completadas=True),
+        "Ventas completadas por ciudad",
+        "Ciudad",
+        monetario=True,
+        color=COLORES[3],
+    )
+
+
+def grafico_regiones(datos):
+    return _grafico_dona(
+        ventas_por_region(datos, solo_completadas=True),
+        "Distribución de ventas completadas por región",
+        "Región",
+        monetario=True,
+    )
+
+
+def grafico_estados(datos):
+    figura = go.Figure()
+    resumen = ventas_por_estado(datos)
+    for estado, importe in resumen.items():
+        figura.add_trace(
+            go.Bar(
+                x=[importe],
+                y=[estado],
+                orientation="h",
+                name=estado,
+                marker_color=COLOR_ESTADOS.get(
+                    normalizar_texto(estado), COLORES[len(figura.data) % len(COLORES)]
+                ),
+                text=[f"S/ {importe:,.2f}"],
+                textposition="outside",
+                cliponaxis=False,
+                hovertemplate="Estado: %{y}<br>Importe: S/ %{x:,.2f}<extra></extra>",
+            )
+        )
+    _estilo_base(figura, "Importe por estado de venta", 350)
+    figura.update_layout(
+        barmode="group",
+        showlegend=True,
+        legend=dict(orientation="h", x=0.5, xanchor="center", y=-0.1, yanchor="top"),
+        margin=dict(l=110, r=48, t=58, b=70),
+    )
+    figura.update_xaxes(title="Importe (S/)", tickformat=",.2f", separatethousands=True)
+    figura.update_yaxes(title=None)
+    return figura
+
+
+def grafico_evolucion_ventas(datos):
+    resumen = ventas_por_fecha(datos, solo_completadas=True)
+    fechas = sorted(resumen)
+    figura = go.Figure()
+    if fechas:
+        figura.add_trace(
+            go.Scatter(
+                x=fechas,
+                y=[resumen[fecha] for fecha in fechas],
+                mode="lines+markers",
+                line=dict(color=COLORES[0], width=2.5),
+                marker=dict(size=7, color=COLORES[0]),
+                fill="tozeroy",
+                fillcolor="rgba(49, 87, 164, 0.08)",
+                hovertemplate="Fecha: %{x|%d/%m/%Y}<br>Ventas: S/ %{y:,.2f}<extra></extra>",
+            )
+        )
+    _estilo_base(figura, "Evolución de ventas completadas", 370)
+    figura.update_xaxes(title="Fecha", type="date", tickformat="%d %b")
+    figura.update_yaxes(title="Ventas (S/)", tickformat=",.2f", separatethousands=True)
+    return figura
+
+
+def grafico_cantidad_estados(datos):
+    return _grafico_dona(
+        contar_ventas_por_estado(datos),
+        "Operaciones por estado",
+        "Estado",
+    )

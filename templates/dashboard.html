@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#14213d">
+    <title>COMERCIAL | Dashboard analítico</title>
+    <script src="https://cdn.plot.ly/plotly-3.3.0.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/estilo.css') }}">
+</head>
+<body>
+    <header class="barra-superior">
+        <div class="marca">
+            <span class="marca-icono" aria-hidden="true">
+                <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M4 19V5m0 14h17M8 15v-4m5 4V7m5 8V9" />
+                </svg>
+            </span>
+            <div>
+                <strong>COMERCIAL</strong>
+                <span>Dashboard analítico</span>
+            </div>
+        </div>
+
+        <div class="barra-acciones">
+            <div class="estado-fuente {% if estado_conexion %}conectado{% else %}desconectado{% endif %}">
+                <span class="indicador" aria-hidden="true"></span>
+                <span>{% if estado_conexion %}Google Sheets conectado{% else %}Sin conexión{% endif %}</span>
+            </div>
+            <form method="post" action="{{ url_for('actualizar_datos') }}" class="form-actualizar">
+                <button class="boton boton-actualizar" type="submit">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4.9 9a7.5 7.5 0 0 1 12.7-2L20 12M4 17v-5h5m10.1 3a7.5 7.5 0 0 1-12.7 2L4 12" /></svg>
+                    Actualizar datos
+                </button>
+            </form>
+        </div>
+    </header>
+
+    <main class="contenido">
+        <section class="cabecera-pagina">
+            <h1>Resumen de ventas</h1>
+            <p class="actualizacion">
+                Última actualización
+                <strong>{% if ultima_actualizacion %}{{ ultima_actualizacion }}{% else %}Sin actualizar{% endif %}</strong>
+            </p>
+        </section>
+
+        {% if error_fuente %}
+            <div class="mensaje mensaje-error" role="alert">{{ error_fuente }}</div>
+        {% endif %}
+        <section class="seccion-kpis" aria-label="Indicadores principales">
+            <div class="contenedor-kpis">
+                <article class="tarjeta-kpi kpi-azul">
+                    <div class="kpi-icono" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5" /></svg>
+                    </div>
+                    <p class="kpi-etiqueta">Operaciones</p>
+                    <p class="kpi-valor">{{ "{:,}".format(total_registros) }}</p>
+                </article>
+
+                <article class="tarjeta-kpi kpi-verde">
+                    <div class="kpi-icono" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><path d="m4 7 8-4 8 4-8 4-8-4Zm0 0v10l8 4 8-4V7M12 11v10" /></svg>
+                    </div>
+                    <p class="kpi-etiqueta">Unidades</p>
+                    <p class="kpi-valor">{{ "{:,}".format(unidades_completadas) }}</p>
+                </article>
+
+                <article class="tarjeta-kpi kpi-indigo">
+                    <div class="kpi-icono" aria-hidden="true">
+                        <svg viewBox="0 0 24 24">
+                            <text class="simbolo-sol" x="12" y="16" text-anchor="middle">S/</text>
+                        </svg>
+                    </div>
+                    <p class="kpi-etiqueta">Ingresos</p>
+                    <p class="kpi-valor">S/ {{ "{:,.2f}".format(ingresos_completados) }}</p>
+                    <p class="kpi-detalle">Completados</p>
+                </article>
+
+                <article class="tarjeta-kpi kpi-ambar">
+                    <div class="kpi-icono" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+                    </div>
+                    <p class="kpi-etiqueta">Ticket promedio</p>
+                    <p class="kpi-valor">S/ {{ "{:,.2f}".format(ticket_promedio) }}</p>
+                </article>
+            </div>
+        </section>
+
+        <section class="seccion-graficos" aria-labelledby="titulo-graficos">
+            <div class="titulo-seccion">
+                <h2 id="titulo-graficos">Análisis de ventas</h2>
+            </div>
+
+            {% if total_registros == 0 and not error_fuente %}
+                <p class="mensaje mensaje-vacio" role="status">No hay registros disponibles para mostrar.</p>
+            {% endif %}
+            <div class="contenedor-graficos">
+                {% for grafico in graficos %}
+                    <article class="tarjeta-grafico" aria-label="{{ grafico.titulo }}">
+                        {{ grafico.html | safe }}
+                    </article>
+                {% endfor %}
+            </div>
+        </section>
+    </main>
+
+    <footer class="pie-pagina">
+        <span>COMERCIAL · Dashboard analítico</span>
+        <span>ASE262 | Programación Estructurada</span>
+    </footer>
+</body>
+</html>
